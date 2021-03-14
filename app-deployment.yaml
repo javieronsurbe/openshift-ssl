@@ -1,0 +1,64 @@
+kind: Deployment
+apiVersion: apps/v1
+metadata:
+  name: app
+spec:
+  selector:
+    matchLabels:
+      app: app
+  template:
+    metadata:
+      labels:
+        app: app
+    spec:
+      containers:
+        - name: app
+          volumeMounts:
+            - name: keystore-volume
+              mountPath: /var/run/secrets/keystores
+            - name: keystore-volume
+              mountPath: /etc/ssl/certs/java/cacerts
+              subPath: app-trustore
+          env: 
+            - name: key_store_password
+              value: changeme
+      initContainers:
+        - name: pem-to-keystore
+          image: base-image:1.0.0
+          env:
+            - name: keyfile
+              value: /var/run/secrets/app-certs/tls.key
+            - name: crtfile
+              value: /var/run/secrets/app-certs/tls.crt
+            - name: keystore_pkcs12
+              value: /var/run/secrets/keystores/keystore.pkcs12
+            - name: keystore_jks
+              value: /var/run/secrets/keystores/keystore.jks
+            - name: key_store_password
+              value: changeme
+          command:
+            - /usr/local/bin/local-keystore-trustore
+          volumeMounts:
+            - name: keystore-volume
+              mountPath: /var/run/secrets/keystores
+            - name: app-certs
+              mountPath: /var/run/secrets/app-certs   
+            - name: ca-certificates
+              mountPath: /etc/ssl/certs/service-ca.crt
+              subPath: service-ca.crt
+            - name: pem-to-keystore
+              mountPath: /usr/local/bin
+      volumes:
+        - name: keystore-volume
+          emptyDir: {}
+        - name: app-certs
+          secret:
+            secretName: app-certs
+        - name: ca-certificates
+          configMap:
+            name: ca-certificates
+            defaultMode: 420
+        - name: pem-to-keystore
+          configMap:
+            name: pem-to-keystore
+            defaultMode: 0775
